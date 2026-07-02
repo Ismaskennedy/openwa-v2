@@ -1,0 +1,82 @@
+// Esquema de base de datos - PostgreSQL (Prisma Postgres en Vercel)
+// Documentación: https://www.prisma.io/docs
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  AGENTE
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  RECEIVED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(AGENTE)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Contact {
+  id          String    @id @default(cuid())
+  // Número en formato internacional sin '+', ej: 5215512345678
+  phone       String    @unique
+  name        String?
+  tags        String?   // etiquetas separadas por coma, ej: "clientes,promo-julio"
+  createdAt   DateTime  @default(now())
+  messages    Message[]
+}
+
+model Message {
+  id            String        @id @default(cuid())
+  waMessageId   String?       @unique // id que asigna Meta al mensaje
+  contactId     String?
+  contact       Contact?      @relation(fields: [contactId], references: [id])
+  phone         String        // número involucrado (para inbound sin contacto aún registrado)
+  direction     Direction
+  type          String        @default("text") // text, template, image, document, etc.
+  body          String?       @db.Text
+  templateName  String?
+  status        MessageStatus @default(PENDING)
+  errorMessage  String?       @db.Text
+  campaignId    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([phone])
+  @@index([campaignId])
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  templateName String
+  totalContacts Int    @default(0)
+  sentCount   Int      @default(0)
+  failedCount Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+}
